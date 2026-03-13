@@ -38,7 +38,7 @@ class FrameBuffer:
     def get(self):
         with self.lock:
             return self.jpeg, self.timestamp
-            
+
 class TemperatureBuffer:
     """Stocke la dernière température MLX90614 (thread-safe)."""
     def __init__(self):
@@ -86,7 +86,8 @@ def camera_capture_loop():
             # OpenCV attend plutôt BGR, mais pour JPEG ça n'a pas d'importance si on ne traite pas.
             # Si tu veux afficher correctement en OpenCV côté client, on garde un encodage standard.
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            
+            frame_bgr = cv2.flip(frame_bgr, -1)  # -1 = horizontal + vertical (180°)
+
             ambient, obj, _ = TEMPBUF.get()
 
             if ambient is not None:
@@ -101,7 +102,7 @@ def camera_capture_loop():
                     2,
                     cv2.LINE_AA
                 )
-            
+
             ok, jpg = cv2.imencode(".jpg", frame_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
             if ok:
                 FRAMEBUF.update(jpg.tobytes())
@@ -115,7 +116,7 @@ def read_temp(bus, reg):
 
 
 def temperature_loop():
-    bus = smbus.SMBus(I2C_BUS)
+    bus = smbus2.SMBus(I2C_BUS)
 
     while True:
         try:
@@ -160,6 +161,8 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=FRAME")
             self.end_headers()
 
+            frame_delay = 1.0 / max(1, FPS_LIMIT)
+
             try:
                 while True:
                     jpeg, ts = FRAMEBUF.get()
@@ -174,7 +177,7 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
                     self.wfile.write(b"\r\n")
 
                     # petit sleep pour éviter de saturer inutilement
-                    time.sleep(0.001)
+                    time.sleep(frame_delay)
             except (BrokenPipeError, ConnectionResetError):
                 # client a fermé
                 return
