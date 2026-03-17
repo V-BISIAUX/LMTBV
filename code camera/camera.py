@@ -19,7 +19,7 @@ import cv2
 from picamera2 import Picamera2
 
 from buffers import RawFrameBuffer, JpegBuffer
-from config import RESOLUTION, FPS_LIMIT, JPEG_QUALITY, FLIP_IMAGE
+from config import RESOLUTION, FPS_LIMIT, JPEG_QUALITY, FLIP_IMAGE, ENCODE_RESOLUTION
 
 log = logging.getLogger(__name__)
 
@@ -72,13 +72,21 @@ class EncodeThread(threading.Thread):
         self._jpeg_buf = jpeg_buf
 
     def run(self) -> None:
-        log.info("Encodeur JPEG démarré (qualité=%d).", JPEG_QUALITY)
+        log.info("Encodeur JPEG démarré (qualité=%d, résolution=%s).",
+                 JPEG_QUALITY, ENCODE_RESOLUTION or "native")
         last_seq = 0
 
         while True:
             frame, last_seq = self._raw_buf.wait_for_new(last_seq)
             if frame is None:
-                continue    # timeout sans nouvelle frame — boucle
+                continue
+
+            # Frame-drop : si une frame plus récente est déjà dispo, on saute
+            # directement dessus au lieu de traiter toutes les frames en retard.
+            latest, latest_seq = self._raw_buf.get_latest()
+            if latest_seq > last_seq:
+                frame    = latest
+                last_seq = latest_seq
 
             jpeg = self._encode(frame)
             if jpeg is not None:
@@ -93,6 +101,12 @@ class EncodeThread(threading.Thread):
 
         if FLIP_IMAGE:
             frame_bgr = cv2.flip(frame_bgr, -1)    # rotation 180°
+
+        if ENCODE_RESOLUTION is not None:
+            frame_bgr = cv2.resize(
+                frame_bgr, ENCODE_RESOLUTION,
+                interpolation=cv2.INTER_LINEAR,
+            )
 
         ok, jpg = cv2.imencode(
             ".jpg", frame_bgr,

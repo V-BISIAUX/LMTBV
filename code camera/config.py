@@ -9,9 +9,10 @@ PORT = 8000
 
 # ── Caméra ──────────────────────────────────────────────────────────────────
 RESOLUTION   = (640, 480)   # (largeur, hauteur) en pixels
-FPS_LIMIT    = 15           # images/seconde maximales côté driver
-JPEG_QUALITY = 80           # qualité JPEG [1-100]
+FPS_LIMIT    = 10           # images/seconde maximales côté driver
+JPEG_QUALITY = 60           # qualité JPEG [1-100]
 FLIP_IMAGE   = True         # True → rotation 180° (montage caméra tête en bas)
+ENCODE_RESOLUTION = (320, 240)
 
 # ── Capteur MLX90614 ────────────────────────────────────────────────────────
 I2C_BUS    = 1

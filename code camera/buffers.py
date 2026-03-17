@@ -52,6 +52,14 @@ class RawFrameBuffer:
             return self._frame, self._seq
 
 
+    def get_latest(self):
+        """
+        Retourne immédiatement la frame la plus récente sans bloquer.
+        Utilisé par EncodeThread pour sauter les frames en retard (frame-drop).
+        """
+        with self._condition:
+            return self._frame, self._seq
+
 # ---------------------------------------------------------------------------
 # JpegBuffer  — bytes JPEG prêts à être envoyés au client
 # ---------------------------------------------------------------------------
