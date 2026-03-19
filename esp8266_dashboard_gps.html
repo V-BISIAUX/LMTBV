@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ESP8266 — Station Capteurs + GPS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet"/>
+  <!-- Leaflet pour la carte GPS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg:      #0a0e1a;
+      --panel:   #0f1628;
+      --border:  #1e2d50;
+      --accent1: #00e5ff;
+      --accent2: #76ff03;
+      --accent3: #ff6d00;
+      --warn:    #ff1744;
+      --text:    #cfd8e3;
+      --dim:     #4a5568;
+      --radius:  12px;
+      --mono:    'Share Tech Mono', monospace;
+      --sans:    'Exo 2', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    header { position: relative; z-index: 1; text-align: center; margin-bottom: 2rem; }
+    header h1 {
+      font-size: clamp(1.5rem,5vw,2.4rem);
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--accent1);
+      text-shadow: 0 0 18px rgba(0,229,255,.4);
+    }
+    header p { font-family: var(--mono); font-size: .75rem; color: var(--dim); margin-top: .3rem; }
+
+    .config-bar {
+      position: relative; z-index: 1;
+      display: flex; gap: .6rem; align-items: center;
+      margin-bottom: 1.6rem; flex-wrap: wrap; justify-content: center;
+    }
+    .config-bar label { font-family: var(--mono); font-size: .8rem; color: var(--dim); }
+    .config-bar input {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--accent1); font-family: var(--mono);
+      font-size: .9rem; padding: .4rem .8rem; width: 180px; outline: none;
+      transition: border-color .2s;
+    }
+    .config-bar input:focus { border-color: var(--accent1); }
+
+    .btn {
+      background: transparent; border: 1px solid var(--accent1); color: var(--accent1);
+      font-family: var(--sans); font-weight: 600; font-size: .8rem;
+      padding: .42rem 1rem; border-radius: 6px; cursor: pointer;
+      letter-spacing: .08em; text-transform: uppercase;
+      transition: background .2s, color .2s;
+    }
+    .btn:hover { background: var(--accent1); color: var(--bg); }
+
+    /* ── Sections ── */
+    .section-title {
+      position: relative; z-index: 1;
+      font-family: var(--mono); font-size: .7rem;
+      letter-spacing: .2em; text-transform: uppercase;
+      color: var(--dim); margin: 1.4rem 0 .8rem;
+      width: 100%; max-width: 900px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: .4rem;
+    }
+
+    /* ── Grid ── */
+    .grid {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.2rem;
+      width: 100%; max-width: 900px;
+    }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.4rem 1.6rem 1.2rem;
+      position: relative; overflow: hidden;
+      transition: border-color .3s, box-shadow .3s;
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--card-color, var(--accent1));
+      box-shadow: 0 0 10px var(--card-color, var(--accent1));
+    }
+    .card:hover { border-color: var(--card-color, var(--accent1)); box-shadow: 0 0 20px rgba(0,0,0,.5); }
+
+    .card-label { font-family: var(--mono); font-size: .65rem; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin-bottom: .25rem; }
+    .card-value { font-family: var(--mono); font-size: 2.4rem; color: var(--card-color, var(--accent1)); line-height: 1; text-shadow: 0 0 16px var(--card-color, var(--accent1)); }
+    .card-unit  { font-family: var(--mono); font-size: 1rem; color: var(--dim); margin-left: .25rem; }
+    .card-sub   { font-family: var(--mono); font-size: .72rem; color: var(--dim); margin-top: .5rem; }
+
+    /* Jauge qualité air */
+    .gauge-track { height: 7px; background: #1a2035; border-radius: 4px; overflow: hidden; margin-top: .6rem; }
+    .gauge-fill  { height: 100%; border-radius: 4px; transition: width .6s ease, background .6s; }
+    .gauge-labels { display: flex; justify-content: space-between; font-family: var(--mono); font-size: .6rem; color: var(--dim); margin-top: .25rem; }
+
+    /* ── GPS card full-width ── */
+    .gps-grid {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      width: 100%; max-width: 900px;
+    }
+
+    .gps-pill {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; padding: .8rem 1rem;
+    }
+    .gps-pill .label { font-family: var(--mono); font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: var(--dim); margin-bottom: .2rem; }
+    .gps-pill .val   { font-family: var(--mono); font-size: 1rem; color: var(--accent1); }
+
+    /* Fix badge */
+    .fix-badge {
+      display: inline-block; font-family: var(--mono); font-size: .7rem;
+      letter-spacing: .1em; text-transform: uppercase;
+      padding: .2rem .7rem; border-radius: 20px;
+      background: var(--border); color: var(--dim);
+      transition: background .4s, color .4s;
+    }
+    .fix-badge.active { background: rgba(118,255,3,.15); color: var(--accent2); border: 1px solid var(--accent2); }
+
+    /* ── Carte Leaflet ── */
+    .map-container {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 900px;
+      height: 320px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      margin-top: .8rem;
+    }
+
+    #map { width: 100%; height: 100%; background: #111; }
+    .map-placeholder {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; color: var(--dim);
+      font-family: var(--mono); font-size: .85rem; gap: .5rem;
+    }
+
+    /* ── Statut ── */
+    .status-bar {
+      position: relative; z-index: 1;
+      margin-top: 1.8rem; display: flex; align-items: center; gap: .8rem;
+      font-family: var(--mono); font-size: .75rem; color: var(--dim);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); transition: background .3s, box-shadow .3s; }
+    .dot.online  { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+    .dot.error   { background: var(--warn);    box-shadow: 0 0 8px var(--warn); }
+    .dot.loading { background: var(--accent3); animation: blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .refresh-row {
+      position: relative; z-index: 1;
+      display: flex; gap: .8rem; align-items: center;
+      margin-top: .6rem; font-family: var(--mono); font-size: .72rem; color: var(--dim);
+    }
+    select {
+      background: var(--panel); border: 1px solid var(--border);
+      color: var(--text); font-family: var(--mono); font-size: .72rem;
+      padding: .28rem .5rem; border-radius: 5px; outline: none;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Station ESP8266</h1>
+  <p>DHT11 · Flying Fish · G28U7FTTL GPS · NMEA-0183</p>
+</header>
+
+<div class="config-bar">
+  <label for="ipInput">Adresse IP ESP8266 :</label>
+  <input id="ipInput" type="text" value="192.168.1.100" placeholder="ex: 192.168.1.42"/>
+  <button class="btn" onclick="fetchNow()">↺ Actualiser</button>
+</div>
+
+<!-- Environnement -->
+<div class="section-title">Environnement</div>
+<div class="grid">
+  <div class="card" style="--card-color:#ff6d00">
+    <div class="card-label">Température</div>
+    <div><span class="card-value" id="temp">--</span><span class="card-unit">°C</span></div>
+    <div class="card-sub" id="tempSub">En attente…</div>
+  </div>
+  <div class="card" style="--card-color:#00e5ff">
+    <div class="card-label">Humidité</div>
+    <div><span class="card-value" id="humi">--</span><span class="card-unit">%</span></div>
+    <div class="card-sub" id="humiSub">En attente…</div>
+  </div>
+  <div class="card" style="--card-color:#76ff03">
+    <div class="card-label">Qualité de l'air</div>
+    <div><span class="card-value" id="airVal">--</span><span class="card-unit">%</span></div>
+    <div class="gauge-track"><div class="gauge-fill" id="gaugeFill" style="width:0%"></div></div>
+    <div class="gauge-labels"><span>Pollué</span><span>Excellent</span></div>
+    <div class="card-sub" id="airLabel">En attente…</div>
+  </div>
+  <div class="card" style="--card-color:#ce93d8">
+    <div class="card-label">ADC brut (Flying Fish)</div>
+    <div><span class="card-value" id="rawVal" style="font-size:2rem">----</span><span class="card-unit">/1023</span></div>
+    <div class="card-sub">Signal analogique A0</div>
+  </div>
+</div>
+
+<!-- GPS -->
+<div class="section-title">
+  GPS G28U7FTTL &nbsp;
+  <span class="fix-badge" id="fixBadge">Pas de fix</span>
+</div>
+<div class="gps-grid">
+  <div class="gps-pill"><div class="label">Latitude</div><div class="val" id="gLat">--</div></div>
+  <div class="gps-pill"><div class="label">Longitude</div><div class="val" id="gLng">--</div></div>
+  <div class="gps-pill"><div class="label">Altitude</div><div class="val" id="gAlt">-- m</div></div>
+  <div class="gps-pill"><div class="label">Vitesse</div><div class="val" id="gSpeed">-- km/h</div></div>
+  <div class="gps-pill"><div class="label">Cap</div><div class="val" id="gCourse">-- °</div></div>
+  <div class="gps-pill"><div class="label">Satellites</div><div class="val" id="gSats">--</div></div>
+  <div class="gps-pill"><div class="label">HDOP</div><div class="val" id="gHdop">--</div></div>
+  <div class="gps-pill"><div class="label">Date/heure UTC</div><div class="val" id="gDateTime">--</div></div>
+</div>
+
+<!-- Carte -->
+<div class="map-container">
+  <div id="map">
+    <div class="map-placeholder" id="mapPlaceholder">
+      <span style="font-size:2rem">🛰️</span>
+      <span>En attente du fix GPS…</span>
+    </div>
+  </div>
+</div>
+
+<!-- Statut -->
+<div class="status-bar">
+  <div class="dot" id="dot"></div>
+  <span id="statusText">Non connecté</span>
+</div>
+<div class="refresh-row">
+  <span>Rafraîchissement auto :</span>
+  <select id="intervalSel" onchange="changeInterval()">
+    <option value="0">Désactivé</option>
+    <option value="3000">3 s</option>
+    <option value="5000" selected>5 s</option>
+    <option value="10000">10 s</option>
+    <option value="30000">30 s</option>
+  </select>
+  <span id="lastUpdate"></span>
+</div>
+
+<script>
+let timer = null;
+let map = null;
+let marker = null;
+let mapInit = false;
+
+function getIP() { return document.getElementById('ipInput').value.trim(); }
+
+function setStatus(state, msg) {
+  document.getElementById('dot').className = 'dot ' + state;
+  document.getElementById('statusText').textContent = msg;
+}
+
+function airColor(q) {
+  if (q >= 80) return '#76ff03';
+  if (q >= 60) return '#c6ff00';
+  if (q >= 40) return '#ffea00';
+  if (q >= 20) return '#ff6d00';
+  return '#ff1744';
+}
+
+function initMap(lat, lng) {
+  if (mapInit) return;
+  mapInit = true;
+  document.getElementById('mapPlaceholder').style.display = 'none';
+  map = L.map('map', { zoomControl: true }).setView([lat, lng], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19
+  }).addTo(map);
+  marker = L.marker([lat, lng]).addTo(map).bindPopup('ESP8266 GPS').openPopup();
+}
+
+function updateMap(lat, lng) {
+  if (!mapInit) { initMap(lat, lng); return; }
+  marker.setLatLng([lat, lng]);
+  map.panTo([lat, lng]);
+}
+
+async function fetchNow() {
+  const ip = getIP();
+  if (!ip) return;
+  setStatus('loading', 'Interrogation de l\'ESP8266…');
+  try {
+    const res = await fetch(`http://${ip}/data`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+
+    // Environnement
+    document.getElementById('temp').textContent    = d.temperature ?? '--';
+    document.getElementById('tempSub').textContent = d.temperature != null
+      ? (d.temperature < 18 ? '🥶 Frais' : d.temperature < 26 ? '✓ Confortable' : '🔥 Chaud')
+      : 'Erreur DHT11';
+    document.getElementById('humi').textContent    = d.humidity ?? '--';
+    document.getElementById('humiSub').textContent = d.humidity != null
+      ? (d.humidity < 30 ? '⚠ Sec' : d.humidity < 60 ? '✓ Confortable' : '⚠ Humide')
+      : 'Erreur DHT11';
+    document.getElementById('airVal').textContent  = d.air_quality;
+    document.getElementById('airLabel').textContent = d.air_label;
+    document.getElementById('rawVal').textContent  = d.air_raw;
+    const fill = document.getElementById('gaugeFill');
+    fill.style.width = d.air_quality + '%';
+    fill.style.background = airColor(d.air_quality);
+
+    // GPS
+    const g = d.gps;
+    const hasFix = g.fix && g.latitude != null && g.longitude != null;
+
+    const badge = document.getElementById('fixBadge');
+    badge.textContent = hasFix ? '✓ Fix GPS' : 'Pas de fix';
+    badge.className   = 'fix-badge' + (hasFix ? ' active' : '');
+
+    document.getElementById('gLat').textContent     = g.latitude  != null ? g.latitude.toFixed(6) + '°' : '--';
+    document.getElementById('gLng').textContent     = g.longitude != null ? g.longitude.toFixed(6) + '°' : '--';
+    document.getElementById('gAlt').textContent     = g.altitude  != null ? g.altitude.toFixed(1) + ' m' : '-- m';
+    document.getElementById('gSpeed').textContent   = g.speed_kmh != null ? g.speed_kmh.toFixed(1) + ' km/h' : '-- km/h';
+    document.getElementById('gCourse').textContent  = g.course_deg != null ? g.course_deg.toFixed(1) + ' °' : '-- °';
+    document.getElementById('gSats').textContent    = g.satellites ?? '--';
+    document.getElementById('gHdop').textContent    = g.hdop ?? '--';
+
+    const dt = (g.date && g.time) ? g.date + ' ' + g.time : '--';
+    document.getElementById('gDateTime').textContent = dt;
+
+    if (hasFix) updateMap(g.latitude, g.longitude);
+
+    setStatus('online', 'Données reçues');
+    document.getElementById('lastUpdate').textContent = 'Màj : ' + new Date().toLocaleTimeString('fr-FR');
+
+  } catch(e) {
+    setStatus('error', 'Erreur : ' + e.message);
+  }
+}
+
+function changeInterval() {
+  clearInterval(timer);
+  const ms = parseInt(document.getElementById('intervalSel').value);
+  if (ms > 0) timer = setInterval(fetchNow, ms);
+}
+
+changeInterval();
+fetchNow();
+</script>
+</body>
+</html>
