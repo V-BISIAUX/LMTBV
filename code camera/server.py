@@ -1,22 +1,22 @@
 """
-server.py — Serveur HTTP multithread avec trois routes :
+server.py — Serveur HTTP multithread avec quatre routes :
 
-  GET /                      → page HTML (interface de visualisation)
-  GET /stream.mjpg           → flux MJPEG (frames JPEG en multipart)
-  GET /temperature/stream    → flux SSE   (JSON poussé à chaque mesure)
-
-Les handlers MJPEG et SSE bloquent sur leur buffer respectif (Condition.wait)
-et ne consomment pas de CPU entre deux frames/mesures.
+  GET /                      → page HTML
+  GET /stream.mjpg           → flux MJPEG
+  GET /temperature/stream    → flux SSE température MLX90614
+  GET /esp/data              → dernière trame ESP8266 en JSON (polling)
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import socket
 from http import server
 from socketserver import ThreadingMixIn
 
 from buffers import JPEG_BUF, TEMP_BUF
+from pi_receiver_usb import ESP_BUF
 from frontend import PAGE
 
 log = logging.getLogger(__name__)
@@ -30,14 +30,13 @@ BOUNDARY = b"FRAME"
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
 
-    # ── Routage ─────────────────────────────────────────────────────────────
-
     def do_GET(self):
         routes = {
             "/":                   self._serve_index,
             "/index.html":         self._serve_index,
             "/stream.mjpg":        self._serve_mjpeg,
             "/temperature/stream": self._serve_temperature_sse,
+            "/esp/data":           self._serve_esp_data,
         }
         handler = routes.get(self.path)
         if handler:
@@ -45,8 +44,6 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
         else:
             self.send_error(404)
             self.end_headers()
-
-    # ── Route : page HTML ────────────────────────────────────────────────────
 
     def _serve_index(self):
         content = PAGE.encode("utf-8")
@@ -56,8 +53,6 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
         self.send_header("Cache-Control",  "no-cache")
         self.end_headers()
         self.wfile.write(content)
-
-    # ── Route : flux MJPEG ───────────────────────────────────────────────────
 
     def _serve_mjpeg(self):
         self.send_response(200)
@@ -81,8 +76,6 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
                 self.wfile.write(b"\r\n")
         except (BrokenPipeError, ConnectionResetError):
             pass    # client déconnecté — fermeture propre
-
-    # ── Route : flux SSE température ─────────────────────────────────────────
 
     def _serve_temperature_sse(self):
         """
@@ -120,6 +113,20 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass    # client déconnecté
 
+    def _serve_esp_data(self):
+        """Retourne la dernière trame ESP8266 en JSON. 503 si aucune trame reçue."""
+        data = ESP_BUF.get()
+        if data is None:
+            self.send_error(503, "Aucune donnée ESP disponible")
+            return
+        payload = json.dumps(data).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type",   "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Cache-Control",  "no-cache")
+        self.end_headers()
+        self.wfile.write(payload)
+
     # ── Logs ─────────────────────────────────────────────────────────────────
 
     def log_message(self, fmt, *args):
@@ -134,6 +141,10 @@ class ThreadedHTTPServer(ThreadingMixIn, server.HTTPServer):
     """Un thread par connexion cliente — la boucle principale n'est pas bloquée."""
     daemon_threads      = True
     allow_reuse_address = True
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        super().server_bind()
 
 
 def create_server(host: str, port: int) -> ThreadedHTTPServer:
