@@ -83,6 +83,7 @@ class EspReceiverThread(threading.Thread):
 
     def __init__(self):
         super().__init__(name="EspReceiverThread", daemon=True)
+        self._accumulator = ""
 
     def run(self) -> None:
         log.info("EspReceiverThread démarré (%s @ %d baud).", SERIAL_PORT, BAUDRATE)
@@ -111,16 +112,61 @@ class EspReceiverThread(threading.Thread):
             while True:
                 raw = ser.readline()
                 if not raw:
-                    continue    # timeout TIMEOUT sans données — reboucle
-                try:
-                    ligne = raw.decode("utf-8").strip()
-                except UnicodeDecodeError:
-                    log.warning("Erreur de décodage, trame ignorée.")
                     continue
-                if ligne:
-                    _traiter_trame(ligne)
+                try:
+                    chunk = raw.decode("utf-8").strip()
+                except UnicodeDecodeError:
+                    log.warning("Erreur de décodage, fragment ignoré.")
+                    self._accumulator = ""
+                    continue
+
+                if not chunk:
+                    continue
+
+                # Ignore les fragments reçus avant le début d'une trame complète
+                if not self._accumulator and not chunk.startswith('{'):
+                    log.debug("Fragment de démarrage ignoré : %r", chunk)
+                    continue
+
+                self._accumulator += chunk
+
+                if self._is_complete(self._accumulator):
+                    _traiter_trame(self._accumulator)
+                    self._accumulator = ""
+                elif len(self._accumulator) > 4096:
+                    log.warning("Accumulateur trop grand, reset. Brut : %r",
+                                self._accumulator[:80])
+                    self._accumulator = ""
+
         except serial.SerialException as e:
             log.warning("Connexion série perdue : %s.", e)
         finally:
             ser.close()
+            self._accumulator = ""
             log.info("Port série fermé.")
+
+    @staticmethod
+    def _is_complete(s: str) -> bool:
+        """Retourne True si la chaîne contient un JSON avec accolades équilibrées."""
+        depth = 0
+        in_string = False
+        escape = False
+        for c in s:
+            if escape:
+                escape = False
+                continue
+            if c == '\\' and in_string:
+                escape = True
+                continue
+            if c == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return True
+        return False
