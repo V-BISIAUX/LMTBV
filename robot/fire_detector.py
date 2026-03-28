@@ -5,6 +5,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+import buffers
 from config import (
     FIRE_TEMP_C, FIRE_HUMIDITY, FIRE_AIR_QUALITY,
     THRESHOLDS_FILE, FIRE_LOG_FILE, FIRE_DEDUP_RADIUS_M,
@@ -46,7 +47,7 @@ def _is_fire(esp_data: dict) -> tuple[bool, list[str]]:
 
     temp = esp_data.get("temperature")
     if temp is not None and temp > t["temp_object_c"]:
-        why.append(f"température={temp:.1f}°C > {t['temp_object_c']}°C")
+        why.append(f"température_esp={temp:.1f}°C > {t['temp_object_c']}°C")
 
     humidity = esp_data.get("humidity")
     if humidity is not None and humidity < t["humidity_pct"]:
@@ -55,6 +56,10 @@ def _is_fire(esp_data: dict) -> tuple[bool, list[str]]:
     air_quality = esp_data.get("air_quality")
     if air_quality is not None and air_quality < t["air_quality"]:
         why.append(f"qualité_air={air_quality} < {t['air_quality']}")
+
+    mlx_sample = buffers.temp.get()
+    if mlx_sample is not None and mlx_sample.object_c > t["temp_object_c"]:
+        why.append(f"température_mlx={mlx_sample.object_c:.1f}°C > {t['temp_object_c']}°C")
 
     return bool(why), why
 
@@ -98,6 +103,7 @@ def check(esp_data: dict):
     lon = gps.get("longitude")
     fix = bool(gps.get("fix")) and lat is not None
 
+    mlx_sample = buffers.temp.get()
     event = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "lat":       lat,
@@ -105,6 +111,7 @@ def check(esp_data: dict):
         "gps_fix":   fix,
         "reasons":   reasons,
         "temp_esp_c":    esp_data.get("temperature"),
+        "temp_mlx_c":    round(mlx_sample.object_c, 2) if mlx_sample else None,
         "humidity":      esp_data.get("humidity"),
         "air_quality":   esp_data.get("air_quality"),
     }
