@@ -27,9 +27,44 @@
       color: var(--text);
       font-family: 'Courier New', monospace;
       height: 100vh;
+      height: 100dvh;
       display: grid;
       grid-template-columns: 1fr 300px;
       overflow: hidden;
+    }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 900px) {
+      body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        overflow: auto;
+        height: auto;
+      }
+      .video-col {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        height: 50vw;           /* hauteur proportionnelle à la largeur */
+        min-height: 200px;
+        max-height: 400px;
+      }
+      .video-col img {
+        width: 100%; height: 100%;
+        object-fit: contain;
+      }
+      aside {
+        overflow-y: visible;
+      }
+      #map { height: 260px; }
+      #no-fix { height: 260px; }
+    }
+
+    @media (max-width: 480px) {
+      .section { padding: 12px 12px 10px; }
+      .row { font-size: .74rem; }
+      .row .v { font-size: .82rem; }
+      #map { height: 220px; }
+      #no-fix { height: 220px; }
     }
 
     .video-col {
@@ -87,12 +122,17 @@
 
     .row {
       display: flex; justify-content: space-between;
-      align-items: baseline; padding: 5px 0;
+      align-items: baseline; padding: 6px 8px;
       border-bottom: 1px solid #1a2030; font-size: .78rem;
+      border-radius: 4px;
     }
-    .row:last-child { border-bottom: none; padding-bottom: 0; }
-    .row .k { color: var(--muted); }
-    .row .v { color: var(--text); font-weight: 700; font-size: .85rem; letter-spacing: .03em; }
+    .row:nth-child(odd)  { background: rgba(255,255,255,.03); }
+    .row:nth-child(even) { background: transparent; }
+    .row:last-child { border-bottom: none; padding-bottom: 6px; }
+    /* Clé : on passe de --muted (#4a5568) à une teinte plus claire */
+    .row .k { color: #7a90a8; letter-spacing: .02em; }
+    /* Valeur : légèrement plus grande et lumineuse */
+    .row .v { color: #e8f0f8; font-weight: 700; font-size: .88rem; letter-spacing: .03em; }
     .row .v.hot { color: var(--red); }
 
     .fix-row {
@@ -117,7 +157,6 @@
       background: #48bb78;
     }
 
-    /* Feux */
     .fire-badge {
       display: inline-flex; align-items: center; gap: 6px;
       font-size: .72rem; color: var(--orange); margin-bottom: 10px;
@@ -136,7 +175,34 @@
     .fire-item .fire-info { color: var(--muted); line-height: 1.5; }
     .fire-item .fire-time { color: var(--text); }
 
-    /* Carte */
+    /* ── Tooltips Leaflet ────────────────────────────────── */
+    .leaflet-tooltip {
+      background: #0d1117 !important;
+      border: 1px solid var(--orange) !important;
+      border-radius: 6px !important;
+      color: var(--text) !important;
+      font-family: 'Courier New', monospace !important;
+      font-size: .72rem !important;
+      line-height: 1.6 !important;
+      padding: 7px 10px !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,.6) !important;
+      white-space: pre-line !important;   /* respecte les \n passés dans le tooltip */
+      max-width: 220px !important;
+    }
+    .leaflet-tooltip::before {
+      border-top-color: var(--orange) !important;
+    }
+    /* Popup (si utilisé à la place du tooltip) */
+    .leaflet-popup-content-wrapper {
+      background: #0d1117 !important;
+      border: 1px solid var(--orange) !important;
+      color: var(--text) !important;
+      font-family: 'Courier New', monospace !important;
+      font-size: .73rem !important;
+      border-radius: 6px !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,.6) !important;
+    }
+    .leaflet-popup-tip { background: #0d1117 !important; }
     #map-wrap { position: relative; border-top: 1px solid var(--border); }
     #map { width: 100%; height: 200px; }
     #no-fix {
@@ -175,7 +241,10 @@
     </div>
 
     <div class="section">
-      <div class="section-title"><span class="name">MLX90614</span></div>
+      <div class="section-title">
+        <span class="name">MLX90614</span>
+
+      </div>
       <div class="row"><span class="k">Ambiante</span><span class="v" id="amb">--.- °C</span></div>
       <div class="row"><span class="k">Objet</span>   <span class="v" id="obj">--.- °C</span></div>
       <div class="gauge-wrap">
@@ -226,6 +295,8 @@
     const $ = id => document.getElementById(id);
     let leafMap = null, robotMarker = null;
     const fireMarkers = [];
+
+
 
     function setLastUpdate() {
       $('last-update').textContent = new Date().toLocaleTimeString('fr-FR');
@@ -290,7 +361,7 @@
         if (!leafMap || f.lat == null) return;
         if (fireMarkers.some(m => m.ts === f.timestamp)) return;
         const m = L.marker([f.lat, f.lon], { icon: fireIcon })
-          .bindTooltip([time, ...f.reasons].join('\n'), { permanent: false })
+          .bindTooltip([time, ...f.reasons].join('\n'), { permanent: false, direction: 'top' })
           .addTo(leafMap);
         fireMarkers.push({ ts: f.timestamp, marker: m });
       });
