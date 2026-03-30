@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
+    /* Variables CSS globales : couleurs et polices utilisées dans toute la page */
     :root {
       --bg:     #0a0c0f;
       --panel:  #111418;
@@ -22,6 +23,7 @@
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* Mise en page principale : vidéo à gauche, panneau de données à droite */
     body {
       background: var(--bg);
       color: var(--text);
@@ -33,7 +35,7 @@
       overflow: hidden;
     }
 
-    /* ── Responsive ──────────────────────────────────────── */
+    /*  Responsive : adaptation pour écrans  */
     @media (max-width: 900px) {
       body {
         grid-template-columns: 1fr;
@@ -44,7 +46,7 @@
       .video-col {
         border-right: none;
         border-bottom: 1px solid var(--border);
-        height: 50vw;           /* hauteur proportionnelle à la largeur */
+        height: 50vw;
         min-height: 200px;
         max-height: 400px;
       }
@@ -108,6 +110,7 @@
     .status-bar .sse-dot.err  { background: var(--red); }
     #last-update { color: var(--muted); }
 
+    /* Section générique : bloc avec titre et lignes de données */
     .section {
       padding: 16px 16px 14px;
       border-bottom: 1px solid var(--border);
@@ -126,15 +129,15 @@
       border-bottom: 1px solid #1a2030; font-size: .78rem;
       border-radius: 4px;
     }
+    /* Alternance de fond pour améliorer la lisibilité */
     .row:nth-child(odd)  { background: rgba(255,255,255,.03); }
     .row:nth-child(even) { background: transparent; }
     .row:last-child { border-bottom: none; padding-bottom: 6px; }
-    /* Clé : on passe de --muted (#4a5568) à une teinte plus claire */
-    .row .k { color: #7a90a8; letter-spacing: .02em; }
-    /* Valeur : légèrement plus grande et lumineuse */
-    .row .v { color: #e8f0f8; font-weight: 700; font-size: .88rem; letter-spacing: .03em; }
-    .row .v.hot { color: var(--red); }
+    .row .k { color: #7a90a8; letter-spacing: .02em; }       /* libellé de la clé */
+    .row .v { color: #e8f0f8; font-weight: 700; font-size: .88rem; letter-spacing: .03em; } /* valeur */
+    .row .v.hot { color: var(--red); }   /* valeur en rouge si température trop élevée */
 
+    /* Indicateur GPS : point coloré + texte de statut */
     .fix-row {
       display: flex; align-items: center; gap: 6px;
       font-size: .7rem; color: var(--muted); margin-bottom: 12px;
@@ -146,6 +149,7 @@
     .dot.ok  { background: var(--green); box-shadow: 0 0 5px var(--green); }
     .dot.err { background: var(--red);   box-shadow: 0 0 5px var(--red); }
 
+    /* Jauge de température */
     .gauge-wrap { margin-top: 10px; }
     .gauge-track {
       width: 100%; height: 7px; border-radius: 4px;
@@ -157,6 +161,7 @@
       background: #48bb78;
     }
 
+    /* Badge indiquant le nombre de feux détectés dans la session */
     .fire-badge {
       display: inline-flex; align-items: center; gap: 6px;
       font-size: .72rem; color: var(--orange); margin-bottom: 10px;
@@ -166,6 +171,7 @@
       border-radius: 10px; padding: 1px 7px;
       font-weight: 700; font-size: .7rem;
     }
+    /* Un élément de liste pour chaque feu détecté */
     .fire-item {
       display: flex; align-items: flex-start; gap: 7px;
       padding: 5px 0; border-bottom: 1px solid #1a2030; font-size: .7rem;
@@ -175,7 +181,7 @@
     .fire-item .fire-info { color: var(--muted); line-height: 1.5; }
     .fire-item .fire-time { color: var(--text); }
 
-    /* ── Tooltips Leaflet ────────────────────────────────── */
+    /* Style des tooltips de la carte Leaflet */
     .leaflet-tooltip {
       background: #0d1117 !important;
       border: 1px solid var(--orange) !important;
@@ -186,13 +192,13 @@
       line-height: 1.6 !important;
       padding: 7px 10px !important;
       box-shadow: 0 4px 16px rgba(0,0,0,.6) !important;
-      white-space: pre-line !important;   /* respecte les \n passés dans le tooltip */
+      white-space: pre-line !important;   /* permet les sauts de ligne (\n) dans le tooltip */
       max-width: 220px !important;
     }
     .leaflet-tooltip::before {
       border-top-color: var(--orange) !important;
     }
-    /* Popup (si utilisé à la place du tooltip) */
+    /* Style des popups Leaflet (alternative au tooltip) */
     .leaflet-popup-content-wrapper {
       background: #0d1117 !important;
       border: 1px solid var(--orange) !important;
@@ -203,6 +209,7 @@
       box-shadow: 0 4px 16px rgba(0,0,0,.6) !important;
     }
     .leaflet-popup-tip { background: #0d1117 !important; }
+
     #map-wrap { position: relative; border-top: 1px solid var(--border); }
     #map { width: 100%; height: 200px; }
     #no-fix {
@@ -211,6 +218,8 @@
       flex-direction: column; gap: 6px;
     }
     #no-fix .no-fix-icon { font-size: 1.4rem; opacity: .3; }
+
+    /* Bouton plein écran de la carte */
     #btn-fullscreen {
       position: absolute; top: 8px; right: 8px;
       background: var(--panel2); border: 1px solid var(--border);
@@ -220,18 +229,22 @@
       align-items: center; justify-content: center; z-index: 1000;
     }
     #btn-fullscreen:hover { background: #1c2230; }
+    /* La carte prend toute la hauteur de l'écran en mode plein écran */
     #map-wrap:-webkit-full-screen #map,
     #map-wrap:fullscreen #map { height: 100vh; }
   </style>
 </head>
 <body>
 
+  <!-- Colonne gauche -->
   <div class="video-col">
     <img src="/stream.mjpg" alt="stream"/>
   </div>
 
+  <!-- Panneau latéral droit -->
   <aside>
 
+    <!-- Barre de statut -->
     <div class="status-bar">
       <div class="sse-status">
         <div class="sse-dot" id="sse-dot"></div>
@@ -240,38 +253,43 @@
       <span id="last-update">--:--:--</span>
     </div>
 
+    <!-- Section capteur infrarouge MLX90614 -->
     <div class="section">
       <div class="section-title">
         <span class="name">MLX90614</span>
-
       </div>
-      <div class="row"><span class="k">Ambiante</span><span class="v" id="amb">--.- °C</span></div>
-      <div class="row"><span class="k">Objet</span>   <span class="v" id="obj">--.- °C</span></div>
+      <div class="row"><span class="k">Ambiante</span>  <span class="v" id="amb">--.- °C</span></div>
+      <div class="row"><span class="k">Objet</span>  <span class="v" id="obj">--.- °C</span></div>
+      <!-- Jauge visuelle de la température objet -->
       <div class="gauge-wrap">
         <div class="gauge-track"><div class="gauge-fill" id="gauge-fill"></div></div>
       </div>
     </div>
 
+    <!-- Section ESP8266 -->
     <div class="section">
       <div class="section-title"><span class="name">ESP8266</span></div>
-      <div class="row"><span class="k">Température</span><span class="v" id="e-temp">-- °C</span></div>
-      <div class="row"><span class="k">Humidité</span>   <span class="v" id="e-humi">-- %</span></div>
-      <div class="row"><span class="k">Qualité air</span><span class="v" id="e-air">--</span></div>
+      <div class="row"><span class="k">Température</span>  <span class="v" id="e-temp">-- °C</span></div>
+      <div class="row"><span class="k">Humidité</span>  <span class="v" id="e-humi">-- %</span></div>
+      <div class="row"><span class="k">Qualité air</span>  <span class="v" id="e-air">--</span></div>
     </div>
 
+    <!-- Section GPS -->
     <div class="section">
       <div class="section-title"><span class="name">GPS</span></div>
+      <!-- Point coloré : vert = fix actif, rouge = pas de fix -->
       <div class="fix-row">
         <div class="dot" id="fix-dot"></div>
         <span id="fix-text">Pas de fix GPS</span>
       </div>
-      <div class="row"><span class="k">Latitude</span>   <span class="v" id="g-lat">--</span></div>
+      <div class="row"><span class="k">Latitude</span>  <span class="v" id="g-lat">--</span></div>
       <div class="row"><span class="k">Longitude</span>  <span class="v" id="g-lng">--</span></div>
-      <div class="row"><span class="k">Altitude</span>   <span class="v" id="g-alt">--</span></div>
-      <div class="row"><span class="k">Vitesse</span>    <span class="v" id="g-spd">--</span></div>
-      <div class="row"><span class="k">Satellites</span> <span class="v" id="g-sat">--</span></div>
+      <div class="row"><span class="k">Altitude</span>  <span class="v" id="g-alt">--</span></div>
+      <div class="row"><span class="k">Vitesse</span>  <span class="v" id="g-spd">--</span></div>
+      <div class="row"><span class="k">Satellites</span>  <span class="v" id="g-sat">--</span></div>
     </div>
 
+    <!-- Section feux détectés -->
     <div class="section">
       <div class="section-title"><span class="name">Feux détectés</span></div>
       <div class="fire-badge">
@@ -280,6 +298,7 @@
       </div>
     </div>
 
+    <!-- Carte Leaflet -->
     <div id="map-wrap">
       <div id="no-fix">
         <span class="no-fix-icon">◎</span>
@@ -293,22 +312,26 @@
 
   <script>
     const $ = id => document.getElementById(id);
+
     let leafMap = null, robotMarker = null;
-    const fireMarkers = [];
+    const fireMarkers = [];   // liste des marqueurs de feux déjà ajoutés à la carte
 
 
-
+    // Met à jour l'heure de dernière réception de données
     function setLastUpdate() {
       $('last-update').textContent = new Date().toLocaleTimeString('fr-FR');
     }
 
+    // Met à jour la jauge de température
+    // Bleu < 15°C, vert < 30°C, orange < 42°C, rouge au-delà
     function updateGauge(temp) {
       const pct   = Math.min(Math.max(temp / 50 * 100, 0), 100);
       const color = temp <= 15 ? '#63b3ed' : temp <= 30 ? '#48bb78' : temp <= 42 ? '#f6ad55' : '#ff4d4d';
-      $('gauge-fill').style.width      = pct + '%';
+      $('gauge-fill').style.width = pct + '%';
       $('gauge-fill').style.background = color;
     }
 
+    // Initialise la carte Leaflet au premier fix GPS reçu
     function initMap(lat, lng) {
       $('no-fix').style.display = 'none';
       $('map').style.display    = 'block';
@@ -320,12 +343,14 @@
       robotMarker = L.marker([lat, lng]).addTo(leafMap);
     }
 
+    // Déplace le marqueur du robot et recentre la carte sur sa position
     function updateMap(lat, lng) {
       if (!leafMap) { initMap(lat, lng); return; }
       robotMarker.setLatLng([lat, lng]);
       leafMap.panTo([lat, lng]);
     }
 
+    // Bascule la carte en mode plein écran
     function toggleFullscreen() {
       const el = $('map-wrap');
       if (!document.fullscreenElement) {
@@ -334,15 +359,18 @@
         document.exitFullscreen();
       }
     }
+    // Recalcule la taille de la carte après sortie du plein écran
     document.addEventListener('fullscreenchange', () => {
       leafMap && setTimeout(() => leafMap.invalidateSize(), 100);
     });
 
+    // Icône 🔥 utilisée pour les marqueurs de feux sur la carte
     const fireIcon = L.divIcon({
       html: '<div style="font-size:18px;line-height:1">🔥</div>',
       iconSize: [22, 22], iconAnchor: [11, 11], className: '',
     });
 
+    // Met à jour le compteur et les marqueurs de feux sur la carte
     function updateFireMarkers(fires) {
       $('fire-count').textContent = fires.length;
 
@@ -358,6 +386,7 @@
             ${f.gps_fix ? `<br>${f.lat.toFixed(5)}° ${f.lon.toFixed(5)}°` : ''}
           </span>`;
 
+        // N'ajoute un marqueur que si la carte existe, que le feu a des coordonnées et qu'il n'est pas déjà affiché
         if (!leafMap || f.lat == null) return;
         if (fireMarkers.some(m => m.ts === f.timestamp)) return;
         const m = L.marker([f.lat, f.lon], { icon: fireIcon })
@@ -367,6 +396,8 @@
       });
     }
 
+    // Ouvre une connexion SSE vers /temperature/stream et met à jour les températures MLX en temps réel
+    // Erreur : reconnection automatiquement après 3 secondes
     function connectSSE() {
       const es = new EventSource('/temperature/stream');
       es.onopen = () => {
@@ -390,6 +421,7 @@
       };
     }
 
+    // Récupère les données de l'ESP8266
     async function fetchEsp() {
       try {
         const r = await fetch('/esp/data');
@@ -402,9 +434,9 @@
         const hasFix = g.fix && g.latitude != null && g.longitude != null;
         $('fix-dot').className    = 'dot ' + (hasFix ? 'ok' : 'err');
         $('fix-text').textContent = hasFix ? 'Fix GPS actif' : 'Pas de fix GPS';
-        $('g-lat').textContent = g.latitude  != null ? g.latitude.toFixed(6)  + '°'     : '--';
-        $('g-lng').textContent = g.longitude != null ? g.longitude.toFixed(6) + '°'     : '--';
-        $('g-alt').textContent = g.altitude  != null ? g.altitude.toFixed(1)  + ' m'    : '--';
+        $('g-lat').textContent = g.latitude  != null ? g.latitude.toFixed(6)  + '°' : '--';
+        $('g-lng').textContent = g.longitude != null ? g.longitude.toFixed(6) + '°' : '--';
+        $('g-alt').textContent = g.altitude  != null ? g.altitude.toFixed(1)  + ' m' : '--';
         $('g-spd').textContent = g.speed_kmh != null ? g.speed_kmh.toFixed(1) + ' km/h' : '--';
         $('g-sat').textContent = g.satellites ?? '--';
         if (hasFix) updateMap(g.latitude, g.longitude);
@@ -412,6 +444,7 @@
       } catch(_) {}
     }
 
+    // Récupère la liste des feux détectés et met à jour les marqueurs sur la carte
     async function fetchFires() {
       try {
         const fires = await fetch('/fires').then(r => r.ok ? r.json() : []);
@@ -419,10 +452,12 @@
       } catch(_) {}
     }
 
+    // Démarrage : connexion SSE et chargement des données
     connectSSE();
     fetchEsp();
     fetchFires();
-    setInterval(fetchEsp,   5000);
+    // Rafraîchissement périodique
+    setInterval(fetchEsp, 5000);
     setInterval(fetchFires, 10000);
   </script>
 </body>
