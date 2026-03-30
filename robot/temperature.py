@@ -11,11 +11,13 @@ log = logging.getLogger(__name__)
 
 
 def _read_celsius(bus, register):
+    # Lit un registre 16 bits du capteur et convertit la valeur brute en degrés Celsius
     raw = bus.read_word_data(MLX_ADDR, register) & 0xFFFF
     return raw * 0.02 - 273.15
 
 
 def read_loop():
+    # Boucle principale : lit en continu la température et met le buffer à jour
     bus = smbus2.SMBus(I2C_BUS)
     log.info("MLX90614 démarré (bus %d, 0x%02X)", I2C_BUS, MLX_ADDR)
     while True:
@@ -30,4 +32,5 @@ def read_loop():
 
 
 def start():
+    # Lance read_loop dans un thread daemon
     threading.Thread(target=read_loop, name="temperature", daemon=True).start()
