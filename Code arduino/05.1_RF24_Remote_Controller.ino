@@ -1,73 +1,76 @@
 /**********************************************************************
 * Filename    : RF24_Remote_Controller.ino
 * Product     : Freenove 4WD Car for UNO
-* Description : Code for RF24 Remote Controller.
+* Description : Télécommande NRF24L01 — lit les capteurs et envoie les données au robot
 * Auther      : www.freenove.com
 * Modification: 2019/08/06
 **********************************************************************/
-// NRF24L01
+
+// Bibliothèques nécessaires pour la communication SPI et le module radio NRF24L01
 #include <SPI.h>
 #include "RF24.h"
-RF24 radio(9, 10);                // define the object to control NRF24L01
-const byte addresses[6] = "Free1";// define communication address which should correspond to remote control
-// wireless communication
-int dataWrite[8];                 // define array used to save the write data
-// pin
-const int pot1Pin = A0,           // define POT1 Potentiometer
-          pot2Pin = A1,           // define POT2 Potentiometer
-          joystickXPin = A2,      // define pin for direction X of joystick
-          joystickYPin = A3,      // define pin for direction Y of joystick
-          joystickZPin = 7,       // define pin for direction Z of joystick
-          s1Pin = 4,              // define pin for S1
-          s2Pin = 3,              // define pin for S2
-          s3Pin = 2,              // define pin for S3
-          led1Pin = 6,            // define pin for LED1 which is close to POT1 and used to indicate the state of POT1
-          led2Pin = 5,            // define pin for LED2 which is close to POT2 and used to indicate the state of POT2
-          led3Pin = 8;            // define pin for LED3 which is close to NRF24L01 and used to indicate the state of NRF24L01
+
+RF24 radio(9, 10);                // Objet radio : CE sur broche 9, CSN sur broche 10
+const byte addresses[6] = "Free1";// Adresse de communication (doit être la même côté robot)
+
+int dataWrite[8];                 // Tableau contenant les 8 valeurs à envoyer
+
+// Déclaration des broches d'entrée/sortie
+const int pot1Pin = A0,           // Potentiomètre 1
+          pot2Pin = A1,           // Potentiomètre 2
+          joystickXPin = A2,      // Axe X du joystick (analogique)
+          joystickYPin = A3,      // Axe Y du joystick (analogique)
+          joystickZPin = 7,       // Bouton du joystick (clic, numérique)
+          s1Pin = 4,              // Interrupteur S1
+          s2Pin = 3,              // Interrupteur S2
+          s3Pin = 2,              // Interrupteur S3
+          led1Pin = 6,            // LED1 : indique la position du POT1
+          led2Pin = 5,            // LED2 : indique la position du POT2
+          led3Pin = 8;            // LED3 : indique si la transmission radio réussit
 
 void setup() {
-  // NRF24L01
-  radio.begin();                      // initialize RF24
-  radio.setPALevel(RF24_PA_MAX);      // set power amplifier (PA) level
-  radio.setDataRate(RF24_1MBPS);      // set data rate through the air
-  radio.setRetries(0, 15);            // set the number and delay of retries
-  radio.openWritingPipe(addresses);   // open a pipe for writing
-  radio.openReadingPipe(1, addresses);// open a pipe for reading
-  radio.stopListening();              // stop listening for incoming messages
-  
-// pin
-  pinMode(joystickZPin, INPUT);       // set led1Pin to input mode
-  pinMode(s1Pin, INPUT);              // set s1Pin to input mode
-  pinMode(s2Pin, INPUT);              // set s2Pin to input mode
-  pinMode(s3Pin, INPUT);              // set s3Pin to input mode
-  pinMode(led1Pin, OUTPUT);           // set led1Pin to output mode
-  pinMode(led2Pin, OUTPUT);           // set led2Pin to output mode
-  pinMode(led3Pin, OUTPUT);           // set led3Pin to output mode
+  // Initialisation du module radio NRF24L01
+  radio.begin();                      // Démarre le module radio
+  radio.setPALevel(RF24_PA_MAX);      // Puissance d'émission maximale
+  radio.setDataRate(RF24_1MBPS);      // Débit : 1 Mbit/s
+  radio.setRetries(0, 15);            // 15 tentatives de renvoi si échec, sans délai entre elles
+  radio.openWritingPipe(addresses);   // Ouvre le canal d'émission
+  radio.openReadingPipe(1, addresses);// Ouvre le canal de réception (non utilisé ici)
+  radio.stopListening();              // Mode émetteur uniquement
+
+  // Configuration des broches
+  pinMode(joystickZPin, INPUT);       // Bouton joystick : entrée
+  pinMode(s1Pin, INPUT);              // S1 : entrée
+  pinMode(s2Pin, INPUT);              // S2 : entrée
+  pinMode(s3Pin, INPUT);              // S3 : entrée
+  pinMode(led1Pin, OUTPUT);           // LED1 : sortie
+  pinMode(led2Pin, OUTPUT);           // LED2 : sortie
+  pinMode(led3Pin, OUTPUT);           // LED3 : sortie
 }
 
 void loop()
 {
-  // put the values of rocker, switch and potentiometer into the array
-  dataWrite[0] = analogRead(pot1Pin); // save data of Potentiometer 1
-  dataWrite[1] = analogRead(pot2Pin); // save data of Potentiometer 2
-  dataWrite[2] = analogRead(joystickXPin);  // save data of direction X of joystick
-  dataWrite[3] = analogRead(joystickYPin);  // save data of direction Y of joystick
-  dataWrite[4] = digitalRead(joystickZPin); // save data of direction Z of joystick
-  dataWrite[5] = digitalRead(s1Pin);        // save data of switch 1
-  dataWrite[6] = digitalRead(s2Pin);        // save data of switch 2
-  dataWrite[7] = digitalRead(s3Pin);        // save data of switch 3
+  // Lecture de tous les capteurs et stockage dans le tableau d'envoi
+  dataWrite[0] = analogRead(pot1Pin);           // Valeur du POT1 (0–1023)
+  dataWrite[1] = analogRead(pot2Pin);           // Valeur du POT2 (0–1023)
+  dataWrite[2] = analogRead(joystickXPin);      // Position X du joystick
+  dataWrite[3] = analogRead(joystickYPin);      // Position Y du joystick
+  dataWrite[4] = digitalRead(joystickZPin);     // Bouton du joystick (0 = appuyé)
+  dataWrite[5] = digitalRead(s1Pin);            // État de S1 (0 = activé)
+  dataWrite[6] = digitalRead(s2Pin);            // État de S2
+  dataWrite[7] = digitalRead(s3Pin);            // État de S3
 
-  // write radio data
+  // Envoi du tableau via radio : LED3 s'allume si la transmission réussit
   if (radio.writeFast(&dataWrite, sizeof(dataWrite)))
   {
-    digitalWrite(led3Pin, HIGH);
+    digitalWrite(led3Pin, HIGH);  // Transmission OK
   }
   else {
-    digitalWrite(led3Pin, LOW);
+    digitalWrite(led3Pin, LOW);   // Échec de transmission
   }
-  delay(20);
+  delay(20); // Attendre 20 ms avant le prochain envoi
 
-  // make LED emit different brightness of light according to analog of potentiometer
+  // Faire varier la luminosité des LEDs selon la position des potentiomètres
   analogWrite(led1Pin, map(dataWrite[0], 0, 1023, 0, 255));
   analogWrite(led2Pin, map(dataWrite[1], 0, 1023, 0, 255));
 }
